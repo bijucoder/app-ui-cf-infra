@@ -1,0 +1,18 @@
+version: 0.2
+
+phases:
+  build:
+    commands:
+      - echo Build started on `date`
+      - export BUCKET=$S3Bucket
+      - sam package --template-file template.json --output-template-file outputtemplate.yml
+  post_build:
+    commands:
+      - echo Build completed on `date`
+artifacts:
+  type: zip
+  files:
+    - outputtemplate.yml
+    - dev-config.json
+    - test-config.json
+    - prod-config.json

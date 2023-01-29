@@ -1,0 +1,175 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "Cloudfront S3 Distribution Probot.",
+    "Parameters": {
+    },
+    "Resources": {
+        "ProbotS3": {
+            "Type": "AWS::S3::Bucket",
+            "Properties": {
+                "BucketName": {
+                    "Fn::Sub": "${AWS::StackName}-cloudfront-s3"
+                },
+                "CorsConfiguration": {
+                    "CorsRules": [
+                        {
+                            "AllowedHeaders": [
+                                "*"
+                            ],
+                            "AllowedMethods": [
+                                "GET",
+                                "PUT"
+                            ],
+                            "AllowedOrigins": [
+                                "*"
+                            ],
+                            "Id": "OpenCors",
+                            "MaxAge": "3600"
+                        }
+                    ]
+                }
+            }
+        },
+        "CloudFrontOriginIdentity": {
+            "Type": "AWS::CloudFront::CloudFrontOriginAccessIdentity",
+            "Properties": {
+                "CloudFrontOriginAccessIdentityConfig": {
+                    "Comment": "origin identity"
+                }
+            }
+        },
+        "BucketPolicy": {
+            "Type": "AWS::S3::BucketPolicy",
+            "Properties": {
+                "PolicyDocument": {
+                    "Id": "MyPolicy",
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Sid": "PublicReadForGetBucketObjects",
+                            "Effect": "Allow",
+                            "Principal": {
+                                "CanonicalUser": {
+                                    "Fn::GetAtt": [
+                                        "CloudFrontOriginIdentity",
+                                        "S3CanonicalUserId"
+                                    ]
+                                }
+                            },
+                            "Action": "s3:GetObject",
+                            "Resource": {
+                                "Fn::Join": [
+                                    "",
+                                    [
+                                        "arn:aws:s3:::",
+                                        {
+                                            "Ref": "ProbotS3"
+                                        },
+                                        "/*"
+                                    ]
+                                ]
+                            }
+                        }
+                    ]
+                },
+                "Bucket": {
+                    "Ref": "ProbotS3"
+                }
+            }
+        },
+        "ProbotCloudfront": {
+            "Type": "AWS::CloudFront::Distribution",
+            "Properties": {
+                "DistributionConfig": {
+                    "Origins": [
+                        {
+                            "DomainName": {
+                                "Fn::GetAtt": [
+                                    "ProbotS3",
+                                    "DomainName"
+                                ]
+                            },
+                            "Id": {
+                                "Ref": "ProbotS3"
+                            },
+                            "S3OriginConfig": {
+                                "OriginAccessIdentity": {
+                                    "Fn::Sub": "origin-access-identity/cloudfront/${CloudFrontOriginIdentity}"
+                                }
+                            }
+                        }
+                    ],
+                    "Enabled": true,
+                    "DefaultRootObject": "index.html",
+                    "CustomErrorResponses": [
+                        {
+                            "ErrorCode": 404,
+                            "ResponseCode": 200,
+                            "ResponsePagePath": "/index.html"
+                        },
+                        {
+                            "ErrorCode": 403,
+                            "ResponseCode": 200,
+                            "ResponsePagePath": "/index.html"
+                        }
+                    ],
+                    "DefaultCacheBehavior": {
+                        "AllowedMethods": [
+                            "GET",
+                            "HEAD",
+                            "OPTIONS"
+                        ],
+                        "MinTTL": 86400,
+                        "MaxTTL": 31536000,
+                        "ForwardedValues": {
+                            "QueryString": true,
+                            "Cookies": {
+                                "Forward": "none"
+                            },
+                            "Headers": [
+                                "Access-Control-Request-Headers",
+                                "Access-Control-Request-Method",
+                                "Origin"
+                            ]
+                        },
+                        "TargetOriginId": {
+                            "Ref": "ProbotS3"
+                        },
+                        "ViewerProtocolPolicy": "redirect-to-https"
+                    },
+                    "ViewerCertificate": {
+                        "CloudFrontDefaultCertificate": "true"
+                    }
+                }
+            }
+        }
+    },
+    "Outputs": {
+        "S3BucketURL": {
+            "Value": {
+                "Fn::GetAtt": [
+                    "ProbotS3",
+                    "WebsiteURL"
+                ]
+            }
+        },
+        "S3BucketName": {
+            "Value": {
+                "Ref": "ProbotS3"
+            }
+        },
+        "CloudFrontId": {
+            "Value": {
+                "Ref": "ProbotCloudfront"
+            }
+        },
+        "CloudFrontUrl": {
+            "Value": {
+                "Fn::GetAtt": [
+                    "ProbotCloudfront",
+                    "DomainName"
+                ]
+            }
+        }
+    }
+}
